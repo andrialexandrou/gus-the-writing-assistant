@@ -1,0 +1,27 @@
+{
+  "name": "gus-the-writing-assistant",
+  "version": "1.0.0",
+  "type": "module",
+  "main": "main.ts",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "dev": "rollup -c -w",
+    "build": "rollup -c"
+  },
+  "keywords": [],
+  "author": "Andri Alexandrou <andri.j.alexandrou@gmail.com>",
+  "license": "ISC",
+  "description": "",
+  "dependencies": {
+    "@rollup/plugin-commonjs": "^28.0.2",
+    "@rollup/plugin-node-resolve": "^16.0.0",
+    "@rollup/plugin-typescript": "^12.1.2",
+    "obsidian": "^1.7.2",
+    "rollup": "^4.32.0",
+    "typescript": "^5.7.3"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.10",
+    "tslib": "^2.8.1"
+  }
+}
