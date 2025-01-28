@@ -1,0 +1,55 @@
+.log-modal-container {
+    padding: 1rem;
+}
+
+.form-group {
+    margin-bottom: 1rem;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 0.5rem;
+    font-weight: 500;
+}
+
+.form-group input {
+    width: 100%;
+    padding: 0.5rem;
+    border: 1px solid var(--background-modifier-border);
+    border-radius: 4px;
+    background-color: var(--background-primary);
+    color: var(--text-normal);
+}
+
+.form-group input:focus {
+    outline: 2px solid var(--interactive-accent);
+    outline-offset: -1px;
+}
+
+.error-text {
+    color: var(--text-error);
+    margin-bottom: 1rem;
+    font-size: 0.9em;
+}
+
+.button-container {
+    display: flex;
+    gap: 0.5rem;
+    justify-content: flex-end;
+}
+
+.button-container button {
+    padding: 0.5rem 1rem;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+.button-container button[type="submit"] {
+    background-color: var(--interactive-accent);
+    color: var(--text-on-accent);
+}
+
+.button-container button[type="button"] {
+    background-color: var(--background-modifier-border);
+    color: var(--text-muted);
+}

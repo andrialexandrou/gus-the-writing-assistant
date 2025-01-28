@@ -1,0 +1,8 @@
+{
+  "scriptUrl": "https://script.google.com/macros/s/AKfycbxCVKpqCGxJeCTL1J6h_f9N234DiVOVxPa5kaA1A_CaN07IyArbGaxIPBnmj-ZK9gX2/exec",
+  "apiKey": "bCgIc6w7rbg2MfrPHvWewhlSGqTZuOTb",
+  "targetFilePath": "Writing Log.md",
+  "timerDuration": 1500,
+  "googleSheetId": "1iGladDRzBV6QAqsxsAdsiud6B2ndkeX4TJUPVEgzggQ",
+  "serviceAccountKey": ""
+}
