@@ -1,11 +1,5 @@
-import { App, Modal, Notice, Plugin, PluginSettingTab, Setting, TFile } from 'obsidian';
-
-interface LogEntry {
-    duration: number;
-    activity: string;
-    timestamp?: string;
-    project?: string;
-}
+import { App, Notice, Plugin, PluginSettingTab, Setting, TFile } from 'obsidian';
+import { LogModal, LogEntry } from './log-modal';
 
 interface PluginSettings {
     scriptUrl: string;
@@ -20,207 +14,6 @@ const DEFAULT_SETTINGS: PluginSettings = {
     targetFilePath: '',
     timerDuration: 25 * 60
 };
-
-class LogModal extends Modal {
-    private plugin: TimerPlugin;
-    private inputField: HTMLInputElement;
-    private durationField: HTMLInputElement;
-    private activityField: HTMLInputElement;
-    private projectField: HTMLInputElement;  // New field
-    private errorText: HTMLDivElement;
-    private submitButton: HTMLButtonElement;
- 
-    constructor(app: App, plugin: TimerPlugin) {
-        super(app);
-        this.plugin = plugin;
-    }
- 
-    onOpen() {
-        const {contentEl} = this;
-        contentEl.empty();
-        
-        const container = contentEl.createDiv('log-modal-container');
-        
-        container.createEl('h2', {
-            text: 'Log Writing Activity',
-            attr: {'aria-label': 'Log Writing Activity Form'}
-        });
-
-        const form = container.createEl('form', {
-            cls: 'log-form',
-            attr: {
-                role: 'form',
-                'aria-label': 'Writing activity log form'
-            }
-        });
-
-        form.onsubmit = (e) => e.preventDefault();
-
-        // Duration field
-        const durationGroup = form.createDiv('form-group');
-        durationGroup.createEl('label', {
-            text: 'Duration (minutes)',
-            attr: {'for': 'duration-input'}
-        });
-
-        this.durationField = durationGroup.createEl('input', {
-            type: 'number',
-            attr: {
-                id: 'duration-input',
-                placeholder: '25',
-                min: '1',
-                max: '480',
-                required: 'true',
-                'aria-required': 'true'
-            }
-        });
-
-        // Activity field
-        const activityGroup = form.createDiv('form-group');
-        activityGroup.createEl('label', {
-            text: 'Activity Description',
-            attr: {'for': 'activity-input'}
-        });
-
-        this.activityField = activityGroup.createEl('input', {
-            type: 'text',
-            attr: {
-                id: 'activity-input',
-                placeholder: 'prewriting',
-                required: 'true',
-                'aria-required': 'true'
-            }
-        });
-
-        // Project field
-        const projectGroup = form.createDiv('form-group');
-        projectGroup.createEl('label', {
-            text: 'Project',
-            attr: {'for': 'project-input'}
-        });
-
-        this.projectField = projectGroup.createEl('input', {
-            type: 'text',
-            attr: {
-                id: 'project-input',
-                placeholder: 'save the cat',
-                'aria-required': 'false'
-            }
-        });
-
-        // Error message container
-        this.errorText = form.createDiv('error-text');
-        this.errorText.style.display = 'none';
-        this.errorText.setAttribute('role', 'alert');
-        this.errorText.setAttribute('aria-live', 'polite');
-
-        // Button container
-        const buttonContainer = form.createDiv('button-container');
-
-        this.submitButton = buttonContainer.createEl('button', {
-            text: 'Log Activity',
-            attr: {
-                type: 'submit',
-                'aria-label': 'Submit activity log'
-            }
-        });
-
-        // this.cancelButton = buttonContainer.createEl('button', {
-        //     text: 'Cancel',
-        //     attr: {
-        //         type: 'button',
-        //         'aria-label': 'Cancel logging'
-        //     }
-        // });
-
-        this.setupEventListeners();
-        this.durationField.focus();
-    }
-
-    private setupEventListeners() {
-        this.contentEl.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter' && !e.shiftKey) {
-                this.handleSubmit();
-            }
-            if (e.key === 'Escape') {
-                this.close();
-            }
-        });
-
-        this.submitButton.addEventListener('click', () => {
-            this.handleSubmit();
-        });
-
-        this.durationField.addEventListener('input', () => {
-            this.validateInput();
-        });
-
-        this.activityField.addEventListener('input', () => {
-            this.validateInput();
-        });
-    }
-
-    private validateInput(): boolean {
-        const duration = parseInt(this.durationField.value);
-        const activity = this.activityField.value.trim();
-
-        this.errorText.style.display = 'none';
-        this.errorText.textContent = '';
-
-        if (!duration || duration < 1 || duration > 480) {
-            this.showError('Duration must be between 1 and 480 minutes');
-            return false;
-        }
-
-        if (!activity) {
-            this.showError('Please enter an activity description');
-            return false;
-        }
-
-        return true;
-    }
-
-    private showError(message: string) {
-        this.errorText.textContent = message;
-        this.errorText.style.display = 'block';
-        
-        // Make errors more noticeable
-        this.errorText.style.padding = '8px';
-        this.errorText.style.marginTop = '8px';
-        this.errorText.style.marginBottom = '8px';
-        
-        // Ensure screen readers announce the error
-        this.errorText.setAttribute('role', 'alert');
-        this.errorText.setAttribute('aria-live', 'assertive');
-    }
-
-    private async handleSubmit() {
-        if (!this.validateInput()) {
-            return;
-        }
-    
-        try {
-            const duration = this.durationField.value;
-            const activity = this.activityField.value.trim();
-            const project = this.projectField.value.trim();
-            
-            console.log('Submitting log:', { duration, activity, project });
-            
-            // This will now show the specific API error or network error
-            await this.plugin.parseAndLog(`gus log ${duration}m ${activity}`, project);
-            this.close();
-        } catch (error) {
-            // Show the actual error message from the API or network call
-            console.error('Submit failed:', error);
-            this.showError(error.message || 'Unknown error occurred');
-        }
-    }
-
-    onClose() {
-        const {contentEl} = this;
-        contentEl.empty();
-    }
-}
 
 export default class TimerPlugin extends Plugin {
     settings: PluginSettings;
@@ -259,6 +52,30 @@ export default class TimerPlugin extends Plugin {
 
         this.addSettingTab(new TimerSettingTab(this.app, this));
         this.registerInterval(window.setInterval(() => this.checkTimer(), 1000));
+
+        this.addCommand({
+            id: 'test-sheets-connection',
+            name: 'Test Google Sheets Connection',
+            callback: async () => {
+                try {
+                    const testData: LogEntry = {
+                        timestamp: new Date().toISOString(),
+                        activity: 'test entry',
+                        project: 'test project',
+                        duration: 5,
+                        fluency: 7,
+                        wordCount: 100,
+                        notes: 'This is a test entry'
+                    };
+    
+                    await this.submitToSheets(testData);
+                    new Notice('Test submission successful!');
+                } catch (error) {
+                    console.error('Test submission failed:', error);
+                    new Notice(`Test failed: ${error.message}`);
+                }
+            }
+        });
     }
 
     async loadSettings() {
@@ -295,24 +112,11 @@ export default class TimerPlugin extends Plugin {
     async logEntry(entry: LogEntry) {
         try {
             // Submit to Google Sheets
-            await this.submitToSheets({
-                timestamp: entry.timestamp || new Date().toISOString(),
-                duration: entry.duration,
-                activity: entry.activity,
-                project: entry.project  // Add this line
-            });
-            console.log('trying to submit to sheets')    
+            await this.submitToSheets(entry);
+            
             // Append to local file
-            await this.appendToFile(`
-- Activity: ${entry.activity}
-- Duration: ${entry.duration} minutes
-- Project: ${entry.project || 'No project'}
-- Timestamp: ${new Date(entry.timestamp || Date.now()).toLocaleString()}
-- Process Notes: 
-
-**
-    `);
-    
+            await this.appendToFile(entry);
+        
             new Notice('Activity logged successfully');
         } catch (error) {
             console.error('Error logging activity:', error);
@@ -320,57 +124,50 @@ export default class TimerPlugin extends Plugin {
         }
     }
 
-// In main.ts, update the submitToSheets method:
-    async submitToSheets(data: { timestamp: string; duration: number; activity: string; project?: string }) {
+    async submitToSheets(entry: LogEntry) {
         if (!this.settings.scriptUrl || !this.settings.apiKey) {
             throw new Error('Please configure both the Apps Script URL and API key in settings');
         }
-
+    
         try {
+            const dataArray = [
+                entry.timestamp || new Date().toISOString(),
+                entry.activity,
+                entry.project || '',
+                String(entry.duration),
+                String(entry.fluency || ''),
+                String(entry.wordCount || ''),
+                entry.notes || ''
+            ];
+    
             const baseUrl = this.settings.scriptUrl;
             const apiKey = this.settings.apiKey;
-
             const url = `${baseUrl}?apiKey=${encodeURIComponent(apiKey)}`;
-            console.log('Submission URL:', url);
-            console.log('Submission Data:', JSON.stringify(data));
-
-            const preflightUrl = `${baseUrl}?cors=preflight&apiKey=${encodeURIComponent(apiKey)}`;
-            console.log('Preflight URL:', preflightUrl);
-            await fetch(preflightUrl, { method: 'GET' });
-
+            
+            // Remove the test GET request
+            
             const response = await fetch(url, {
                 method: 'POST',
-                body: JSON.stringify(data),
+                mode: 'no-cors',  // Keep this for CORS handling
                 headers: {
                     'Content-Type': 'application/json'
-                }
+                },
+                body: JSON.stringify(dataArray)
             });
-
-            console.log('Response status:', response.status);
-            
-            // if (!response.ok) {
-            //     const errorText = await response.text();
-            //     console.error('Full response text:', errorText);
-            //     throw new Error(`HTTP error! status: ${response.status}, message: ${errorText}`);
-            // }
-
-            const result = await response.json();
-            console.log('Submission result:', result);
-
-            // if (result.status === 'error') {
-            //     throw new Error(result.message || 'Unknown error from Google Sheets');
-            // }
-
+    
+            // With no-cors mode, we can't read the response
+            // So we'll assume success if we get here without throwing
+            return { success: true };
+    
         } catch (error) {
-            console.error('Detailed submission error:', error);
-            // throw error; // Re-throw to allow caller to handle
+            console.error('Failed to submit to Google Sheets:', error);
+            throw new Error('Failed to submit to Google Sheets');
         }
-        // return result;
     }
 
 
 
-    async appendToFile(content: string): Promise<void> {
+    async appendToFile(entry: LogEntry): Promise<void> {
         const filePath = this.settings.targetFilePath;
         if (!filePath) {
             throw new Error('Target file path not configured');
@@ -382,6 +179,18 @@ export default class TimerPlugin extends Plugin {
         }
     
         try {
+            const content = `
+    - Activity: ${entry.activity}
+    - Duration: ${entry.duration} minutes
+    - Project: ${entry.project || 'No project'}
+    - Timestamp: ${new Date(entry.timestamp || Date.now()).toLocaleString()}
+    - Fluency: ${entry.fluency || 'Not rated'}/10
+    - Word Count: ${entry.wordCount || '0'}
+    - Process Notes: ${entry.notes || 'None'}
+    
+    **
+            `;
+    
             const currentContent = await this.app.vault.read(file);
             await this.app.vault.modify(file, `${currentContent}\n${content}`);
         } catch (error) {
