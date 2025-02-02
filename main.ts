@@ -1,57 +1,37 @@
+// main.ts
 import { App, Notice, Plugin, PluginSettingTab, Setting, TFile } from 'obsidian';
 import { LogModal, LogEntry } from './log-modal';
 
 interface PluginSettings {
     scriptUrl: string;
     apiKey: string;
-    targetFilePath: string;
-    timerDuration: number;
 }
 
 const DEFAULT_SETTINGS: PluginSettings = {
     scriptUrl: '',
-    apiKey: '',
-    targetFilePath: '',
-    timerDuration: 25 * 60
+    apiKey: ''
 };
 
-export default class TimerPlugin extends Plugin {
+export default class WritingLoggerPlugin extends Plugin {
     settings: PluginSettings;
-    timer: NodeJS.Timeout | null = null;
-    timeRemaining: number = 0;
-    isRunning: boolean = false;
 
     async onload() {
         await this.loadSettings();
 
-        // Add timer ribbon icon
-        this.addRibbonIcon('clock', 'Start Timer', () => {
-            if (!this.isRunning) {
-                this.startTimer();
-            } else {
-                this.stopTimer();
+        this.addCommand({
+            id: 'log-writing-activity',
+            name: 'Log Writing Activity',
+            callback: () => {
+                new LogModal(this.app, this).open();
             }
         });
 
         // Add logging ribbon icon
         this.addRibbonIcon('book-heart', 'Log Writing Activity', () => {
-            if (!this.settings.targetFilePath) {
-                new Notice('Please configure target file path in settings');
-                return;
-            }
-            
-            // Check if file exists
-            const file = this.app.vault.getAbstractFileByPath(this.settings.targetFilePath);
-            if (!file) {
-                new Notice('Writing log file not found. Please create it or check the path in settings.');
-                return;
-            }
-        
             new LogModal(this.app, this).open();
         });
 
-        this.addSettingTab(new TimerSettingTab(this.app, this));
-        this.registerInterval(window.setInterval(() => this.checkTimer(), 1000));
+        this.addSettingTab(new WritingLoggerSettingTab(this.app, this));
 
         this.addCommand({
             id: 'test-sheets-connection',
@@ -60,12 +40,16 @@ export default class TimerPlugin extends Plugin {
                 try {
                     const testData: LogEntry = {
                         timestamp: new Date().toISOString(),
+                        startTime: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false }),
                         activity: 'test entry',
                         project: 'test project',
                         duration: 5,
-                        fluency: 7,
+                        fluency: 4,
                         wordCount: 100,
-                        notes: 'This is a test entry'
+                        notes: 'This is a test entry',
+                        stage: 'testing',
+                        plan: 'Test plan',
+                        nextActions: 'Next steps'
                     };
     
                     await this.submitToSheets(testData);
@@ -86,35 +70,12 @@ export default class TimerPlugin extends Plugin {
         await this.saveData(this.settings);
     }
 
-    async parseAndLog(command: string, project?: string): Promise<void> {
-        const regex = /gus log (\d+)m (.+)$/;
-        const match = command.match(regex);
-        
-        if (!match) {
-            throw new Error('Invalid format. Use: gus log <minutes>m <activity>');
-        }
-    
-        const [_, duration, activity] = match;
-        const durationNum = parseInt(duration);
-        
-        if (isNaN(durationNum) || durationNum < 1 || durationNum > 480) {
-            throw new Error('Duration must be between 1 and 480 minutes');
-        }
-    
-        await this.logEntry({
-            duration: durationNum,
-            activity: activity.trim(),
-            timestamp: new Date().toISOString(),
-            project: project
-        });
-    }
-
     async logEntry(entry: LogEntry) {
         try {
             // Submit to Google Sheets
             await this.submitToSheets(entry);
             
-            // Append to local file
+            // Create or append to daily file
             await this.appendToFile(entry);
         
             new Notice('Activity logged successfully');
@@ -131,121 +92,100 @@ export default class TimerPlugin extends Plugin {
     
         try {
             const dataArray = [
-                entry.timestamp || new Date().toISOString(),
-                entry.activity,
+                new Date(entry.timestamp).toISOString().split('T')[0],
+                entry.startTime || '',
                 entry.project || '',
-                String(entry.duration),
-                String(entry.fluency || ''),
+                entry.stage || '',
                 String(entry.wordCount || ''),
-                entry.notes || ''
+                String(entry.fluency || ''),
+                String(entry.duration),
             ];
     
-            const baseUrl = this.settings.scriptUrl;
-            const apiKey = this.settings.apiKey;
-            const url = `${baseUrl}?apiKey=${encodeURIComponent(apiKey)}`;
-            
-            // Remove the test GET request
+            const url = `${this.settings.scriptUrl}?apiKey=${encodeURIComponent(this.settings.apiKey)}`;
             
             const response = await fetch(url, {
                 method: 'POST',
-                mode: 'no-cors',  // Keep this for CORS handling
+                mode: 'no-cors',
                 headers: {
                     'Content-Type': 'application/json'
                 },
                 body: JSON.stringify(dataArray)
             });
     
-            // With no-cors mode, we can't read the response
-            // So we'll assume success if we get here without throwing
             return { success: true };
-    
         } catch (error) {
             console.error('Failed to submit to Google Sheets:', error);
             throw new Error('Failed to submit to Google Sheets');
         }
     }
 
-
-
     async appendToFile(entry: LogEntry): Promise<void> {
-        const filePath = this.settings.targetFilePath;
-        if (!filePath) {
-            throw new Error('Target file path not configured');
-        }
-    
-        const file = this.app.vault.getAbstractFileByPath(filePath);
-        if (!(file instanceof TFile)) {
-            throw new Error(`File not found: ${filePath}`);
-        }
+        const date = new Date(entry.timestamp);
+        const dateStr = date.toISOString().split('T')[0];
+        
+        const sessionNum = await this.getNextSessionNumber(dateStr);
+        const fileName = `${dateStr} Session ${sessionNum}.md`;
+        
+        const content = `
+**
+
+**plan**: ${entry.plan || ''}
+**start time**: ${date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false })}
+**stage**: ${entry.stage || ''}
+**project**: [[${entry.project || 'No project'}]]
+**duration**: ${entry.duration}:00
+**word count**: ${entry.wordCount || ''}
+**process**: ${entry.notes || ''}
+**test stat fluency out of 5**: ${entry.fluency || ''}
+**next actions**: ${entry.nextActions || ''}
+
+**`.trim();
     
         try {
-            const content = `
-    - Activity: ${entry.activity}
-    - Duration: ${entry.duration} minutes
-    - Project: ${entry.project || 'No project'}
-    - Timestamp: ${new Date(entry.timestamp || Date.now()).toLocaleString()}
-    - Fluency: ${entry.fluency || 'Not rated'}/10
-    - Word Count: ${entry.wordCount || '0'}
-    - Process Notes: ${entry.notes || 'None'}
-    
-    **
-            `;
-    
-            const currentContent = await this.app.vault.read(file);
-            await this.app.vault.modify(file, `${currentContent}\n${content}`);
+            // Create the file
+            await this.app.vault.create(fileName, content);
+            
+            // Get the newly created file
+            const newFile = this.app.vault.getAbstractFileByPath(fileName);
+            if (newFile instanceof TFile) {
+                // Open the file in a new leaf
+                const leaf = this.app.workspace.getUnpinnedLeaf();
+                await leaf.openFile(newFile);
+            }
         } catch (error) {
             console.error('Error writing to file:', error);
-            throw new Error('Failed to save log entry to file');
+            throw new Error('Failed to create log entry file');
         }
     }
 
-    startTimer() {
-        this.timeRemaining = this.settings.timerDuration;
-        this.isRunning = true;
-        this.checkTimer();
-        new Notice(`Timer started: ${Math.floor(this.settings.timerDuration / 60)} minutes`);
-    }
-
-    stopTimer() {
-        this.isRunning = false;
-        if (this.timer) {
-            clearTimeout(this.timer);
-            this.timer = null;
-        }
-        new Notice('Timer stopped');
-    }
-
-    async checkTimer() {
-        if (!this.isRunning) return;
+    private async getNextSessionNumber(dateStr: string): Promise<number> {
+        const files = this.app.vault.getFiles();
+        const todayFiles = files.filter(file => 
+            file.name.startsWith(dateStr) && 
+            file.name.includes('Session')
+        );
         
-        this.timeRemaining--;
+        if (todayFiles.length === 0) {
+            return 1;
+        }
         
-        if (this.timeRemaining <= 0) {
-            this.isRunning = false;
-            await this.onTimerComplete();
-        }
-    }
-
-    async onTimerComplete() {
-        try {
-            await this.logEntry({
-                duration: this.settings.timerDuration / 60,
-                activity: 'Timer Session',
-                timestamp: new Date().toISOString()
-            });
-            
-            new Notice('Timer complete! Session logged.');
-        } catch (error) {
-            console.error('Error logging timer session:', error);
-            new Notice('Timer complete, but failed to log session');
-        }
+        let maxSession = 0;
+        todayFiles.forEach(file => {
+            const match = file.name.match(/Session (\d+)/);
+            if (match) {
+                const num = parseInt(match[1]);
+                if (num > maxSession) maxSession = num;
+            }
+        });
+        
+        return maxSession + 1;
     }
 }
 
-class TimerSettingTab extends PluginSettingTab {
-    plugin: TimerPlugin;
+class WritingLoggerSettingTab extends PluginSettingTab {
+    plugin: WritingLoggerPlugin;
 
-    constructor(app: App, plugin: TimerPlugin) {
+    constructor(app: App, plugin: WritingLoggerPlugin) {
         super(app, plugin);
         this.plugin = plugin;
     }
@@ -254,61 +194,9 @@ class TimerSettingTab extends PluginSettingTab {
         const {containerEl} = this;
         containerEl.empty();
 
-        containerEl.createEl('h2', {text: 'Writing Timer Settings'});
-
-        // File Settings Section
-        // In TimerSettingTab class, update the display method file settings section:
-        new Setting(containerEl)
-            .setName('Target File Path')
-            .setDesc('Path to your writing log file (e.g. "Writing Log.md" or "Folder/Writing Log.md")')
-            .addText(text => text
-                .setPlaceholder('Writing Log.md')
-                .setValue(this.plugin.settings.targetFilePath)
-                .onChange(async (value) => {
-                    this.plugin.settings.targetFilePath = value;
-                    await this.plugin.saveSettings();
-                }));
-
-        // Add file path help text
-        const helpList = containerEl.createEl('div', {
-            cls: 'setting-item-description'
-        });
-        helpList.createEl('p', {
-            text: 'File path examples:'
-        });
-        const examples = [
-            '"Writing Log.md" - In vault root',
-            '"Notes/Writing Log.md" - In Notes folder',
-            '"Daily Notes/Writing/Log.md" - Nested folders'
-        ];
-        const ul = helpList.createEl('ul');
-        examples.forEach(example => {
-            ul.createEl('li', {text: example});
-        });
-        helpList.createEl('p', {
-            text: 'Note: The file must already exist in your vault. Create it first, then enter its path here.'
-        });
-
-        // Timer Settings Section
-        containerEl.createEl('h3', {text: 'Timer Settings'});
-
-        new Setting(containerEl)
-            .setName('Timer Duration')
-            .setDesc('Default duration for the writing timer (in minutes)')
-            .addText(text => text
-                .setPlaceholder('25')
-                .setValue(String(this.plugin.settings.timerDuration / 60))
-                .onChange(async (value) => {
-                    const duration = parseInt(value);
-                    if (!isNaN(duration) && duration > 0) {
-                        this.plugin.settings.timerDuration = duration * 60;
-                        await this.plugin.saveSettings();
-                    }
-                }));
+        containerEl.createEl('h2', {text: 'Writing Logger Settings'});
 
         // Google Sheets Integration Section
-        containerEl.createEl('h3', {text: 'Google Sheets Integration'});
-        
         new Setting(containerEl)
             .setName('Apps Script URL')
             .setDesc('URL of your Google Apps Script web app')
@@ -338,12 +226,8 @@ class TimerSettingTab extends PluginSettingTab {
             '1. Create a copy of the template Google Sheet',
             '2. In the sheet, go to Extensions > Apps Script',
             '3. Copy the Apps Script code into the script editor',
-            '4. Click save icon to save to Drive',
-            '5. Run the setupApiKey function to generate your API key',
-            '6. Deploy as a web app:',
-            '\t\t- Execute as: Me',
-            '\t\t- Who has access: Anyone with Google Account',
-            '7. Copy the deployment URL and API key into these settings'
+            '4. Deploy as a web app',
+            '5. Copy the deployment URL and API key into these settings'
         ];
 
         const instructionsList = containerEl.createEl('div', {
