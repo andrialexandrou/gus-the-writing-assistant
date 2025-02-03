@@ -1,6 +1,7 @@
 // log-modal.ts
 import { App, Modal, Setting, Notice } from 'obsidian';
 import WritingLoggerPlugin from './main';
+import { getLocal24HourTime } from './utils/dates';
 
 export interface LogEntry {
     timestamp: string;
@@ -24,11 +25,7 @@ export class LogModal extends Modal {
         const now = new Date();
         this.entry = {
             timestamp: now.toISOString(),
-            startTime: now.toLocaleTimeString('en-US', { 
-                hour: '2-digit', 
-                minute: '2-digit',
-                hour12: false 
-            }),
+            startTime: getLocal24HourTime(now),
             stage: '',
             plan: '',
             project: '',

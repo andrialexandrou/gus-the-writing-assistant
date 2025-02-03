@@ -1,6 +1,7 @@
 // main.ts
 import { App, Notice, Plugin, PluginSettingTab, Setting, TFile } from 'obsidian';
 import { LogModal, LogEntry } from './log-modal';
+import { getLocal24HourTime, getLocalDateString } from './utils/dates';
 
 interface PluginSettings {
     scriptUrl: string;
@@ -91,8 +92,9 @@ export default class WritingLoggerPlugin extends Plugin {
         }
     
         try {
+            const now = new Date(entry.timestamp);
             const dataArray = [
-                new Date(entry.timestamp).toISOString().split('T')[0],
+                getLocalDateString(now),
                 entry.startTime || '',
                 entry.project || '',
                 entry.stage || '',
@@ -120,8 +122,8 @@ export default class WritingLoggerPlugin extends Plugin {
     }
 
     async appendToFile(entry: LogEntry): Promise<void> {
-        const date = new Date(entry.timestamp);
-        const dateStr = date.toISOString().split('T')[0];
+        const now = new Date(entry.timestamp);
+        const dateStr = getLocalDateString(now);
         
         const sessionNum = await this.getNextSessionNumber(dateStr);
         const fileName = `${dateStr} Session ${sessionNum}.md`;
@@ -130,7 +132,7 @@ export default class WritingLoggerPlugin extends Plugin {
 **
 
 **plan**: ${entry.plan || ''}
-**start time**: ${date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false })}
+**start time**: ${getLocal24HourTime(now)}
 **stage**: ${entry.stage || ''}
 **project**: [[${entry.project || 'No project'}]]
 **duration**: ${entry.duration}:00

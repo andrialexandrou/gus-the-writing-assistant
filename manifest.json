@@ -1,7 +1,7 @@
 {
   "id": "gus-the-writing-assistant",
   "name": "Gus the Writing Assistant",
-  "version": "1.0.0",
+  "version": "0.1.1",
   "minAppVersion": "0.15.0",
   "description": "Track time spent in specific writing stages.",
   "author": "Andri Alexandrou",
