@@ -2,6 +2,8 @@
 
 An Obsidian plugin for tracking writing sessions with Google Sheets integration.
 
+![A form interface titled "Log Writing Session" with multiple input fields. The form includes sections for: Plan (asking about session goals), Start Time (in 24-hour format, showing 17:19), Stage (for writing stage), Project (for project name), Duration (in minutes), Word Count (optional), Process (for notes about writing), Test Stat Fluency (with a slider rating 1-5), and Next Actions (for future steps). The form has a purple "Submit" button at the bottom. All fields appear empty or with placeholder text showing example inputs. A close button "×" appears in the top-right corner.](./assets/writing-session-form.png)
+
 ## Features
 
 - Log writing sessions with detailed metadata
